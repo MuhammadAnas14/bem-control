@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Bem Control",
+    "slug": "bem-control",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#1e4f3e"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.bemcontrol.app"
+    },
+    "android": {
+      "package": "com.bemcontrol.app",
+      "permissions": ["CAMERA"]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Bem Control uses the camera to scan a device's provisioning QR code."
+        }
+      ]
+    ],
+    "extra": {
+      "apiUrl": "http://localhost:4000",
+      "wsUrl": "ws://localhost:4001"
+    }
+  }
+}

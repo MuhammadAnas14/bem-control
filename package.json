@@ -1,0 +1,24 @@
+{
+  "name": "bem-control",
+  "private": true,
+  "version": "1.0.0",
+  "description": "IoT Device Fleet Management SaaS platform",
+  "workspaces": [
+    "backend",
+    "web",
+    "mobile",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:web": "npm run dev --workspace=web",
+    "dev:mobile": "npm run start --workspace=mobile",
+    "test:backend": "npm test --workspace=backend",
+    "certs:generate": "bash scripts/generate-dev-certs.sh",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

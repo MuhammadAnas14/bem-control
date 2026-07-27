@@ -1,0 +1,165 @@
+// Bem Control - data model
+//
+// Multi-tenant shape: an Organization owns Devices; Users join Organizations
+// through Membership (with a role), so one user can belong to more than one
+// tenant (e.g. a contractor managing fleets for multiple customers).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum DeviceStatus {
+  UNPROVISIONED // credentials issued, device has never connected
+  ONLINE
+  OFFLINE
+  DISABLED // revoked by an admin - credentials rejected at broker + API
+}
+
+enum CommandType {
+  CONFIG_UPDATE // push new publishInterval / sensor config to the device
+  OTA_TRIGGER // point the device at a new firmware version to download
+  REBOOT
+  CUSTOM
+}
+
+enum CommandStatus {
+  PENDING
+  SENT
+  ACKED
+  FAILED
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships Membership[]
+  devices     Device[]
+
+  @@map("organizations")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships     Membership[]
+  issuedCommands  Command[]
+  pushTokens      PushToken[]
+
+  @@map("users")
+}
+
+model PushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  // Expo push token (e.g. "ExponentPushToken[xxxx]") registered by the
+  // mobile app - lets the backend deliver alerts (device offline, etc.)
+  // even when the app isn't in the foreground to receive a WebSocket event.
+  token     String   @unique
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_tokens")
+}
+
+model Membership {
+  id             String         @id @default(cuid())
+  role           MembershipRole @default(MEMBER)
+  userId         String
+  organizationId String
+  createdAt      DateTime       @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@map("memberships")
+}
+
+model Device {
+  id             String       @id @default(cuid())
+  // Human-readable label set by the user, e.g. "Greenhouse Sensor #3"
+  name           String
+  // Stable public identifier used in MQTT topics and the QR provisioning
+  // payload. Safe to expose; unlike apiKeyHash it grants no access on its own.
+  deviceKey      String       @unique @default(cuid())
+  // bcrypt hash of the device's API key / MQTT password. The plaintext key is
+  // shown to the user exactly once, at provisioning time, then discarded.
+  apiKeyHash     String
+  mqttUsername   String       @unique
+  status         DeviceStatus @default(UNPROVISIONED)
+  firmwareVersion String?
+  // Desired config pushed to the device (publish interval, sensor thresholds).
+  // The device fetches/receives this over its `.../config` topic.
+  desiredConfig  Json         @default("{}")
+  // Optional install location, set at provisioning time or edited later -
+  // powers the fleet map view. Null until a technician sets it in the field.
+  latitude       Float?
+  longitude      Float?
+  lastSeenAt     DateTime?
+  organizationId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  telemetry    TelemetryReading[]
+  commands     Command[]
+
+  @@index([organizationId])
+  @@map("devices")
+}
+
+model TelemetryReading {
+  id         String   @id @default(cuid())
+  deviceId   String
+  // Kept generic (metric/value/unit) rather than fixed temperature/humidity
+  // columns so new sensor types don't require a migration.
+  metric     String
+  value      Float
+  unit       String?
+  recordedAt DateTime @default(now())
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, metric, recordedAt])
+  @@map("telemetry_readings")
+}
+
+model Command {
+  id              String        @id @default(cuid())
+  deviceId        String
+  type            CommandType
+  payload         Json          @default("{}")
+  status          CommandStatus @default(PENDING)
+  createdByUserId String?
+  createdAt       DateTime      @default(now())
+  sentAt          DateTime?
+  ackedAt         DateTime?
+
+  device        Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  createdByUser  User?  @relation(fields: [createdByUserId], references: [id])
+
+  @@index([deviceId, status])
+  @@map("commands")
+}

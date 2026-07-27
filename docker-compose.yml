@@ -1,0 +1,43 @@
+version: "3.8"
+
+# Local development infrastructure only.
+# In production, Postgres and Mosquitto/EMQX would be managed services
+# (e.g. RDS + a hosted MQTT broker), not containers on a single host.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bem-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bem}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bem_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-bem_control}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bem}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: bem-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883" # plain MQTT (LAN/dev only, no TLS)
+      - "8883:8883" # MQTTS (TLS) - used by backend and ESP32 devices
+      - "9001:9001" # MQTT over WebSocket (TLS) - used by web/mobile clients
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/certs:/mosquitto/certs:ro
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+
+volumes:
+  pgdata:
+  mosquitto-data:
+  mosquitto-log:

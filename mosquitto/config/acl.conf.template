@@ -1,0 +1,22 @@
+# ACL template for Bem Control's Mosquitto broker.
+#
+# The real acl.conf (gitignored, lives in mosquitto/certs/acl.conf) is
+# generated from this template plus one block per provisioned device,
+# appended automatically by backend/src/services/mqttProvisioning.js
+# whenever a new ESP32 device is registered.
+#
+# Run `npm run certs:generate` (from repo root) once to bootstrap both
+# files before starting the broker for the first time.
+
+# Backend service account: full access, it's the trust anchor that
+# bridges MQTT telemetry into the database and fans out commands.
+user bem-backend
+topic readwrite #
+
+# --- per-device blocks appended below, one per provisioned device ---
+# Example of what gets appended for device "esp32-abc123":
+#
+# user device-esp32-abc123
+# topic write orgs/+/devices/esp32-abc123/telemetry
+# topic read orgs/+/devices/esp32-abc123/commands
+# topic read orgs/+/devices/esp32-abc123/config
